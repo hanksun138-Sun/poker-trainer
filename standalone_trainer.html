@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GTO 翻前盲打训练舱 v4.1</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+            --accent-yellow: #f59e0b;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg-color); color: var(--text-main); min-height: 100vh; padding: 16px; display: flex; flex-direction: column; align-items: center; }
+
+        .header { width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: var(--card-bg); padding: 12px 20px; border-radius: 12px; }
+        .logo { font-size: 18px; font-weight: bold; color: var(--accent-yellow); display: flex; align-items: center; gap: 6px; }
+
+        /* Nav Tabs */
+        .nav-tabs { width: 100%; max-width: 800px; display: flex; gap: 10px; margin-bottom: 16px; }
+        .tab-btn { flex: 1; padding: 12px 0; background: var(--card-bg); border: 1px solid #334155; color: var(--text-sub); border-radius: 10px; font-weight: bold; font-size: 15px; cursor: pointer; text-align: center; }
+        .tab-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+        .view-panel { width: 100%; max-width: 800px; display: none; }
+        .view-panel.active { display: block; }
+
+        /* 恢复老版大气牌桌 & 6位置布局 */
+        .poker-table { 
+            background: radial-gradient(circle, #065f46 0%, #022c22 100%); 
+            border: 12px solid #292524; 
+            border-radius: 160px; 
+            height: 380px; 
+            width: 100%; 
+            position: relative; 
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 6-Max 位置徽章 */
+        .pos-badge { position: absolute; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; background: #334155; color: #94a3b8; border: 1px solid #475569; transition: all 0.3s ease; }
+        .pos-badge.active-hero { background: var(--accent-yellow); color: #0f172a; border-color: #fef08a; box-shadow: 0 0 15px var(--accent-yellow); transform: scale(1.1); }
+        .pos-badge.active-villain { background: var(--accent-red); color: #ffffff; border-color: #fca5a5; box-shadow: 0 0 15px var(--accent-red); transform: scale(1.1); }
+
+        /* 6个位置精确定位 */
+        .pos-sb { top: 15px; left: 30%; }
+        .pos-bb { top: 15px; right: 30%; }
+        .pos-utg { top: 45%; right: 4%; }
+        .pos-hj { bottom: 25px; right: 25%; }
+        .pos-co { bottom: 25px; left: 25%; }
+        .pos-btn { top: 45%; left: 4%; }
+
+        .scenario-tag { background: rgba(0,0,0,0.6); padding: 6px 16px; border-radius: 20px; font-size: 14px; color: #fde047; border: 1px solid #854d0e; margin-bottom: 12px; font-weight: bold; }
+        
+        /* 扑克牌样式 */
+        .cards-display { display: flex; gap: 16px; z-index: 2; }
+        .poker-card { width: 85px; height: 120px; background: white; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between; padding: 8px 10px; font-weight: bold; font-size: 22px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); }
+        .poker-card.red { color: #dc2626; }
+        .poker-card.black { color: #0f172a; }
+
+        /* 决策按钮网络 */
+        .action-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 10px; }
+        .act-btn { padding: 18px 0; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; transition: transform 0.1s; }
+        .act-btn:active { transform: scale(0.98); }
+        .act-fold { background: #475569; }
+        .act-call { background: var(--accent-green); }
+        .act-raise { background: var(--accent-red); }
+
+        .feedback-box { background: var(--card-bg); border-radius: 12px; padding: 14px; margin-top: 14px; text-align: center; font-size: 15px; border: 1px solid #334155; }
+        
+        /* 13x13 矩阵 */
+        .matrix-container { background: var(--card-bg); padding: 14px; border-radius: 12px; }
+        .grid-13x13 { display: grid; grid-template-columns: repeat(13, 1fr); gap: 3px; width: 100%; aspect-ratio: 1; }
+        .grid-cell { font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 3px; background: #334155; color: #cbd5e1; }
+        .grid-cell.mastered { background: #059669; color: white; }
+        .grid-cell.leak { background: #dc2626; color: white; }
+        .grid-legend { display: flex; justify-content: space-around; margin-top: 12px; font-size: 13px; color: var(--text-sub); }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; padding: 16px; z-index: 999; }
+        .modal-content { background: var(--card-bg); border-radius: 16px; padding: 24px; width: 100%; max-width: 550px; max-height: 85vh; overflow-y: auto; }
+        .input-key { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; margin: 12px 0; font-size: 14px; }
+        .submit-btn { width: 100%; padding: 14px; background: var(--accent-blue); border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">♠️ GTO 翻前盲打训练舱</div>
+        <div style="font-size:13px; color:var(--text-sub);" id="session-count">训练手数: 0</div>
+    </div>
+
+    <!-- 导航切换 -->
+    <div class="nav-tabs">
+        <div class="tab-btn active" onclick="switchTab('trainer')">🎲 盲打训练</div>
+        <div class="tab-btn" onclick="switchTab('matrix')">🔥 169热力图</div>
+        <div class="tab-btn" onclick="showDiagnosisModal()">🤖 AI 战术教练</div>
+    </div>
+
+    <!-- 视图 1：拟真牌桌训练舱 -->
+    <div id="view-trainer" class="view-panel active">
+        <div class="poker-table">
+            <!-- 6 位置徽章灯 -->
+            <div class="pos-badge pos-sb" id="badge-SB">SB</div>
+            <div class="pos-badge pos-bb" id="badge-BB">BB</div>
+            <div class="pos-badge pos-utg" id="badge-UTG">UTG</div>
+            <div class="pos-badge pos-hj" id="badge-HJ">HJ</div>
+            <div class="pos-badge pos-co" id="badge-CO">CO</div>
+            <div class="pos-badge pos-btn" id="badge-BTN">BTN</div>
+
+            <div class="scenario-tag" id="scenario-text">加载场景中...</div>
+            
+            <div class="cards-display" id="cards-container">
+                <div class="poker-card black"><span>-</span><span>-</span></div>
+                <div class="poker-card red"><span>-</span><span>-</span></div>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="act-btn act-fold" onclick="handleDecision('Fold')">弃牌 (Fold)</button>
+            <button class="act-btn act-call" onclick="handleDecision('Call')">跟注 (Call)</button>
+            <button class="act-btn act-raise" onclick="handleDecision('Raise')">加注 (Raise)</button>
+        </div>
+
+        <div class="feedback-box" id="feedback">请选择你的决策 (GTO 盲打模式)</div>
+    </div>
+
+    <!-- 视图 2：13x13 矩阵热力图 -->
+    <div id="view-matrix" class="view-panel">
+        <div class="matrix-container">
+            <div class="grid-13x13" id="matrix-grid"></div>
+            <div class="grid-legend">
+                <span>⬜ 未练</span>
+                <span>🟩 熟练 (>80%)</span>
+                <span>🟥 高危漏洞 (<50%)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 诊断 modal -->
+    <div class="modal-overlay" id="ai-modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom:12px; color:var(--accent-blue);">🤖 Google AI Studio 战术教练</h3>
+            <p style="font-size:13px; color:var(--text-sub); margin-bottom:12px;">粘贴你的 Gemini API Key，获取基于你真实 100 手数据的深度战术诊断。</p>
+            <input type="password" id="gemini-key" class="input-key" placeholder="粘贴 API Key (AIzaSy...)">
+            <button class="submit-btn" onclick="runAIDiagnosis()">生成 100 手深度复盘</button>
+            <div id="ai-result" style="margin-top:16px; font-size:14px; line-height:1.6; white-space:pre-wrap; color:#e2e8f0;"></div>
+            <button onclick="closeModal()" style="margin-top:12px; width:100%; background:transparent; border:none; color:var(--text-sub); cursor:pointer;">关闭</button>
+        </div>
+    </div>
+
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+const POSITIONS = ['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+let currentHand = null;
+let startTime = 0;
+
+let localHistory = JSON.parse(localStorage.getItem('poker_v4_history') || '[]');
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    
+    if (tab === 'trainer') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('view-trainer').classList.add('active');
+    } else if (tab === 'matrix') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('view-matrix').classList.add('active');
+        renderMatrix();
+    }
+}
+
+function generateRandomHand() {
+    const p1 = RANKS[Math.floor(Math.random() * 13)];
+    const p2 = RANKS[Math.floor(Math.random() * 13)];
+    const suited = Math.random() > 0.6;
+    
+    let handStr = p1 + p2;
+    if (p1 === p2) handStr = p1 + p2;
+    else handStr = (RANKS.indexOf(p1) < RANKS.indexOf(p2) ? p1 + p2 : p2 + p1) + (suited ? 's' : 'o');
+
+    const heroPos = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+    let villainPos = null;
+    if (heroPos === 'BB') {
+        const villains = ['UTG', 'HJ', 'CO', 'BTN', 'SB'];
+        villainPos = villains[Math.floor(Math.random() * villains.length)];
+    }
+
+    return { heroPos, villainPos, hand: handStr };
+}
+
+function loadNextHand() {
+    currentHand = generateRandomHand();
+    
+    // 重置并高亮 6 位置灯
+    POSITIONS.forEach(p => {
+        const badge = document.getElementById(`badge-${p}`);
+        badge.className = `pos-badge pos-${p.toLowerCase()}`;
+        badge.innerText = p;
+    });
+
+    const heroBadge = document.getElementById(`badge-${currentHand.heroPos}`);
+    heroBadge.classList.add('active-hero');
+    heroBadge.innerText = `${currentHand.heroPos} (HERO)`;
+
+    if (currentHand.villainPos) {
+        const vBadge = document.getElementById(`badge-${currentHand.villainPos}`);
+        vBadge.classList.add('active-villain');
+        vBadge.innerText = `${currentHand.villainPos} (RAISE)`;
+        document.getElementById('scenario-text').innerText = `面对 ${currentHand.villainPos} 先手 Raise 决策`;
+    } else {
+        document.getElementById('scenario-text').innerText = `${currentHand.heroPos} RFI (率先加注) 场景`;
+    }
+
+    // 渲染扑克牌
+    const cardsContainer = document.getElementById('cards-container');
+    const suits = ['♠', '♥', '♣', '♦'];
+    const c1Suit = suits[Math.floor(Math.random()*4)];
+    const c2Suit = currentHand.hand.endsWith('s') ? c1Suit : suits[(suits.indexOf(c1Suit)+1)%4];
+    
+    const isRed1 = c1Suit === '♥' || c1Suit === '♦';
+    const isRed2 = c2Suit === '♥' || c2Suit === '♦';
+
+    cardsContainer.innerHTML = `
+        <div class="poker-card ${isRed1 ? 'red' : 'black'}"><span>${currentHand.hand[0]}</span><span>${c1Suit}</span></div>
+        <div class="poker-card ${isRed2 ? 'red' : 'black'}"><span>${currentHand.hand[1]}</span><span>${c2Suit}</span></div>
+    `;
+    
+    startTime = Date.now();
+    updateHeader();
+}
+
+function handleDecision(userAction) {
+    const duration = Date.now() - startTime;
+    let isCorrect = true;
+    if (currentHand.hand.startsWith('A') || currentHand.hand.startsWith('K') || currentHand.hand === 'QQ') {
+        if (userAction === 'Fold') isCorrect = false;
+    }
+
+    localHistory.push({
+        hand: currentHand.hand,
+        pos: currentHand.heroPos,
+        userAction: userAction,
+        isCorrect: isCorrect,
+        timeMs: duration
+    });
+    localStorage.setItem('poker_v4_history', JSON.stringify(localHistory));
+
+    const fb = document.getElementById('feedback');
+    fb.innerHTML = isCorrect ? 
+        `<span style="color:var(--accent-green);font-weight:bold;">✅ 正确决策！</span>` : 
+        `<span style="color:var(--accent-red);font-weight:bold;">❌ 偏离 GTO！推荐: Raise/Call</span>`;
+
+    setTimeout(loadNextHand, 800);
+}
+
+function updateHeader() {
+    document.getElementById('session-count').innerText = `训练手数: ${localHistory.length}`;
+}
+
+function renderMatrix() {
+    const grid = document.getElementById('matrix-grid');
+    grid.innerHTML = '';
+    
+    const handStats = {};
+    localHistory.forEach(h => {
+        if (!handStats[h.hand]) handStats[h.hand] = { total: 0, correct: 0 };
+        handStats[h.hand].total++;
+        if (h.isCorrect) handStats[h.hand].correct++;
+    });
+
+    for (let r = 0; r < 13; r++) {
+        for (let c = 0; c < 13; c++) {
+            let label = '';
+            if (r === c) label = RANKS[r] + RANKS[c];
+            else if (r < c) label = RANKS[r] + RANKS[c] + 's';
+            else label = RANKS[c] + RANKS[r] + 'o';
+
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell';
+            cell.innerText = label;
+
+            const stat = handStats[label];
+            if (stat && stat.total > 0) {
+                const acc = stat.correct / stat.total;
+                if (acc >= 0.8) cell.classList.add('mastered');
+                else cell.classList.add('leak');
+            }
+
+            grid.appendChild(cell);
+        }
+    }
+}
+
+function showDiagnosisModal() {
+    document.getElementById('ai-modal').style.display = 'flex';
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) document.getElementById('gemini-key').value = savedKey;
+}
+
+function closeModal() {
+    document.getElementById('ai-modal').style.display = 'none';
+}
+
+async function runAIDiagnosis() {
+    const key = document.getElementById('gemini-key').value.trim();
+    if (!key) { alert('请输入有效的 API Key'); return; }
+    localStorage.setItem('gemini_api_key', key);
+
+    const recent = localHistory.slice(-100);
+    if (recent.length === 0) { alert('尚无训练数据'); return; }
+
+    const resBox = document.getElementById('ai-result');
+    resBox.innerText = "🤖 Gemini 战术教练正在分析你最近 100 手牌数据...";
+
+    const systemPrompt = `你是一位职业级 6-Max 德州扑克 GTO 教练。根据 Hero Hank 最近 100 手训练 JSON 数据，客观分析其漏斗与 EV 损失。给出 300 字精炼诊断，拒绝无脑夸奖，突出阻断与范围漏洞。`;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Type': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [
+                    { role: 'user', parts: [{ text: systemPrompt + "\n数据如下:\n" + JSON.stringify(recent) }] }
+                ]
+            })
+        });
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+            resBox.innerText = data.candidates[0].content.parts[0].text;
+        } else {
+            resBox.innerText = "诊断失败，请检查 API Key 或网络使用。";
+        }
+    } catch (e) {
+        resBox.innerText = "请求异常，请确认 Key 是否正确。";
+    }
+}
+
+loadNextHand();
+</script>
+</body>
+</html>
