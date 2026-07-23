@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GTO 翻前盲打训练舱 v4.3</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+            --accent-yellow: #f59e0b;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg-color); color: var(--text-main); min-height: 100vh; padding: 12px; display: flex; flex-direction: column; align-items: center; }
+
+        .header { width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: var(--card-bg); padding: 12px 20px; border-radius: 12px; }
+        .logo { font-size: 18px; font-weight: bold; color: var(--accent-yellow); }
+
+        .nav-tabs { width: 100%; max-width: 800px; display: flex; gap: 10px; margin-bottom: 12px; }
+        .tab-btn { flex: 1; padding: 10px 0; background: var(--card-bg); border: 1px solid #334155; color: var(--text-sub); border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; text-align: center; }
+        .tab-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+        .view-panel { width: 100%; max-width: 800px; display: none; }
+        .view-panel.active { display: block; }
+
+        .poker-table { 
+            background: radial-gradient(circle, #065f46 0%, #022c22 100%); 
+            border: 10px solid #292524; 
+            border-radius: 160px; 
+            height: 360px; 
+            width: 100%; 
+            position: relative; 
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.5);
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pos-badge { position: absolute; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; background: #334155; color: #94a3b8; border: 1px solid #475569; transition: all 0.3s ease; }
+        .pos-badge.active-hero { background: var(--accent-yellow); color: #0f172a; border-color: #fef08a; box-shadow: 0 0 15px var(--accent-yellow); transform: scale(1.1); }
+        .pos-badge.active-villain { background: var(--accent-red); color: #ffffff; border-color: #fca5a5; box-shadow: 0 0 15px var(--accent-red); transform: scale(1.1); }
+
+        .pos-sb { top: 15px; left: 30%; }
+        .pos-bb { top: 15px; right: 30%; }
+        .pos-utg { top: 40%; right: 4%; }
+        .pos-hj { bottom: 20px; right: 25%; }
+        .pos-co { bottom: 20px; left: 25%; }
+        .pos-btn { top: 40%; left: 4%; }
+
+        .scenario-tag { background: #991b1b; color: #fef2f2; padding: 6px 16px; border-radius: 20px; font-size: 14px; border: 1px solid #ef4444; margin-bottom: 6px; font-weight: bold; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+        .pot-tag { background: #854d0e; color: #fef08a; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 12px; }
+
+        .cards-display { display: flex; gap: 16px; }
+        .poker-card { width: 80px; height: 115px; background: white; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between; padding: 8px 10px; font-weight: bold; font-size: 22px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); }
+        .poker-card.red { color: #dc2626; }
+        .poker-card.black { color: #0f172a; }
+
+        .action-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+        .act-btn { padding: 14px 0; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .act-btn span { font-size: 12px; font-weight: normal; opacity: 0.8; margin-top: 2px; }
+        .act-fold { background: #475569; }
+        .act-call { background: var(--accent-green); }
+        .act-raise { background: var(--accent-red); }
+
+        .stats-dashboard { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--card-bg); padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 12px; border: 1px solid #334155; }
+        .stat-item .val { font-size: 16px; font-weight: bold; color: var(--accent-yellow); margin-top: 4px; }
+        .stat-item .lbl { font-size: 12px; color: var(--text-sub); }
+
+        .feedback-box { background: var(--card-bg); border-radius: 12px; padding: 14px; text-align: center; font-size: 14px; border: 1px solid #334155; line-height: 1.5; }
+
+        .matrix-container { background: var(--card-bg); padding: 14px; border-radius: 12px; }
+        .grid-13x13 { display: grid; grid-template-columns: repeat(13, 1fr); gap: 3px; width: 100%; aspect-ratio: 1; }
+        .grid-cell { font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 3px; background: #334155; color: #cbd5e1; }
+        .grid-cell.mastered { background: #059669; color: white; }
+        .grid-cell.leak { background: #dc2626; color: white; }
+
+        .modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; padding: 16px; z-index: 999; }
+        .modal-content { background: var(--card-bg); border-radius: 16px; padding: 24px; width: 100%; max-width: 550px; max-height: 85vh; overflow-y: auto; }
+        .input-key { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; margin: 12px 0; font-size: 14px; }
+        .submit-btn { width: 100%; padding: 14px; background: var(--accent-blue); border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">♠️ GTO 翻前盲打训练舱</div>
+        <div style="font-size:13px; color:var(--text-sub);" id="version-tag">v4.3 Precision GTO</div>
+    </div>
+
+    <div class="nav-tabs">
+        <div class="tab-btn active" onclick="switchTab('trainer')">🎲 盲打训练</div>
+        <div class="tab-btn" onclick="switchTab('matrix')">🔥 169热力图</div>
+        <div class="tab-btn" onclick="showDiagnosisModal()">🤖 AI 战术教练</div>
+    </div>
+
+    <div id="view-trainer" class="view-panel active">
+        <div class="poker-table">
+            <div class="pos-badge pos-sb" id="badge-SB">SB</div>
+            <div class="pos-badge pos-bb" id="badge-BB">BB</div>
+            <div class="pos-badge pos-utg" id="badge-UTG">UTG</div>
+            <div class="pos-badge pos-hj" id="badge-HJ">HJ</div>
+            <div class="pos-badge pos-co" id="badge-CO">CO</div>
+            <div class="pos-badge pos-btn" id="badge-BTN">BTN</div>
+
+            <div class="scenario-tag" id="scenario-text">场景加载中...</div>
+            <div class="pot-tag" id="pot-text">POT: 1.5 BB</div>
+            
+            <div class="cards-display" id="cards-container"></div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="act-btn act-fold" onclick="handleDecision('Fold')">弃牌<span>Fold</span></button>
+            <button class="act-btn act-call" onclick="handleDecision('Call')">跟注<span>Call</span></button>
+            <button class="act-btn act-raise" onclick="handleDecision('Raise')">加注<span>Raise</span></button>
+        </div>
+
+        <div class="stats-dashboard">
+            <div class="stat-item"><div class="lbl">训练手数</div><div class="val" id="st-hands">0</div></div>
+            <div class="stat-item"><div class="lbl">肌肉准确率</div><div class="val" id="st-acc">-</div></div>
+            <div class="stat-item"><div class="lbl">平均响应</div><div class="val" id="st-time">-</div></div>
+        </div>
+
+        <div class="feedback-box" id="feedback">请选择你的决策 (GTO 盲打模式)</div>
+    </div>
+
+    <div id="view-matrix" class="view-panel">
+        <div class="matrix-container">
+            <div class="grid-13x13" id="matrix-grid"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="ai-modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom:12px; color:var(--accent-blue);">🤖 Google AI Studio 战术教练</h3>
+            <p style="font-size:13px; color:var(--text-sub); margin-bottom:12px;">粘贴你的 Gemini API Key，获取基于你真实数据的深度战术诊断。</p>
+            <input type="password" id="gemini-key" class="input-key" placeholder="粘贴 API Key (AIzaSy...)">
+            <button class="submit-btn" onclick="runAIDiagnosis()">生成深度复盘</button>
+            <div id="ai-result" style="margin-top:16px; font-size:14px; line-height:1.6; white-space:pre-wrap; color:#e2e8f0;"></div>
+            <button onclick="closeModal()" style="margin-top:12px; width:100%; background:transparent; border:none; color:var(--text-sub); cursor:pointer;">关闭</button>
+        </div>
+    </div>
+
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+const POSITIONS = ['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+let currentHand = null;
+let startTime = 0;
+
+let localHistory = JSON.parse(localStorage.getItem('poker_v4_history') || '[]');
+
+// 真实 6-Max GTO RFI (率先加注) 核心库
+const GTO_RFI_RANGES = {
+    UTG: ["AA","KK","QQ","JJ","TT","99","88","77","AKs","AQs","AJs","ATs","A9s","A8s","A5s","A4s","KQs","KJs","KTs","QJs","QTs","JTs","T9s","AKo","AQo"],
+    HJ:  ["AA","KK","QQ","JJ","TT","99","88","77","66","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A5s","A4s","A3s","KQs","KJs","KTs","K9s","QJs","QTs","JTs","T9s","98s","87s","AKo","AQo","AJo"],
+    CO:  ["AA","KK","QQ","JJ","TT","99","88","77","66","55","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","QJs","QTs","Q9s","JTs","JT0","T9s","98s","87s","76s","65s","AKo","AQo","AJo","ATo","KQo","KJo"],
+    BTN: ["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","22","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","K7s","K6s","K5s","QJs","QTs","Q9s","Q8s","JTs","J9s","J8s","T9s","T8s","98s","97s","87s","86s","76s","75s","65s","54s","AKo","AQo","AJo","ATo","A9o","A8o","KQo","KJo","KTo","QJo","QTo","JTo"],
+    SB:  ["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","22","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","K8s","QJs","QTs","Q9s","JTs","J9s","T9s","T8s","98s","87s","76s","65s","54s","AKo","AQo","AJo","ATo","A9o","KQo","KJo","KTo","QJo","QTo","JTo"]
+};
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    
+    if (tab === 'trainer') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('view-trainer').classList.add('active');
+    } else if (tab === 'matrix') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('view-matrix').classList.add('active');
+        renderMatrix();
+    }
+}
+
+function generateRandomHand() {
+    const p1 = RANKS[Math.floor(Math.random() * 13)];
+    const p2 = RANKS[Math.floor(Math.random() * 13)];
+    const suited = Math.random() > 0.55;
+    
+    let handStr = (RANKS.indexOf(p1) <= RANKS.indexOf(p2) ? p1 + p2 : p2 + p1);
+    if (p1 !== p2) handStr += (suited ? 's' : 'o');
+
+    const heroPos = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+    let villainPos = null;
+    
+    if (heroPos === 'BB') {
+        const villains = ['UTG', 'HJ', 'CO', 'BTN', 'SB'];
+        villainPos = villains[Math.floor(Math.random() * villains.length)];
+    } else if (Math.random() > 0.6 && heroPos !== 'UTG') {
+        const idx = POSITIONS.indexOf(heroPos);
+        const villains = POSITIONS.slice(0, idx);
+        if (villains.length > 0) villainPos = villains[Math.floor(Math.random() * villains.length)];
+    }
+
+    return { heroPos, villainPos, hand: handStr };
+}
+
+function loadNextHand() {
+    currentHand = generateRandomHand();
+    
+    POSITIONS.forEach(p => {
+        const badge = document.getElementById(`badge-${p}`);
+        badge.className = `pos-badge pos-${p.toLowerCase()}`;
+        badge.innerText = p;
+    });
+
+    const heroBadge = document.getElementById(`badge-${currentHand.heroPos}`);
+    heroBadge.classList.add('active-hero');
+    heroBadge.innerText = `${currentHand.heroPos} (HERO)`;
+
+    const scText = document.getElementById('scenario-text');
+    const potText = document.getElementById('pot-text');
+
+    if (currentHand.villainPos) {
+        const vBadge = document.getElementById(`badge-${currentHand.villainPos}`);
+        vBadge.classList.add('active-villain');
+        vBadge.innerText = `${currentHand.villainPos} (RAISE)`;
+        scText.innerText = `面对 ${currentHand.villainPos} 率先 Raise`;
+        potText.innerText = `POT: 2.5 BB`;
+    } else {
+        scText.innerText = `${currentHand.heroPos} RFI (未有人加注)`;
+        potText.innerText = `POT: 1.5 BB`;
+    }
+
+    const cardsContainer = document.getElementById('cards-container');
+    const suits = ['♠', '♥', '♣', '♦'];
+    const c1Suit = suits[Math.floor(Math.random()*4)];
+    const c2Suit = currentHand.hand.endsWith('s') ? c1Suit : suits[(suits.indexOf(c1Suit)+1)%4];
+
+    cardsContainer.innerHTML = `
+        <div class="poker-card ${(c1Suit==='♥'||c1Suit==='♦') ? 'red' : 'black'}"><span>${currentHand.hand[0]}</span><span>${c1Suit}</span></div>
+        <div class="poker-card ${(c2Suit==='♥'||c2Suit==='♦') ? 'red' : 'black'}"><span>${currentHand.hand[1]}</span><span>${c2Suit}</span></div>
+    `;
+    
+    startTime = Date.now();
+    updateDashboard();
+}
+
+// 严密精准的 GTO 逻辑查表
+function evaluateGTO(hand, pos, villainPos) {
+    let correctAction = 'Fold';
+    let reason = '';
+
+    if (!villainPos) {
+        // 率先加注场景 (RFI)
+        const range = GTO_RFI_RANGES[pos] || [];
+        if (range.includes(hand)) {
+            correctAction = 'Raise';
+            reason = `GTO 策略：在 ${pos} 位置，${hand} 属于标准率先开牌范围 (Raise)。`;
+        } else {
+            correctAction = 'Fold';
+            reason = `GTO 策略：在 ${pos} 位置，${hand} 处于开牌范围之外，应标准弃牌 (Fold)。`;
+        }
+    } else {
+        // 面对 Raise 场景 (3-Bet / Call / Fold)
+        if (["AA","KK","QQ","JJ","AKs","AKo"].includes(hand)) {
+            correctAction = 'Raise';
+            reason = `GTO 策略：面对 ${villainPos} 开牌，${hand} 是顶级价值手牌，应 3-Bet 加注 (Raise)。`;
+        } else if (["TT","99","88","AQs","AJs","KQs"].includes(hand) || (pos === 'BB' && hand.endsWith('s'))) {
+            correctAction = 'Call';
+            reason = `GTO 策略：面对 ${villainPos} 开牌，${hand} 具备良好的赔率与权益，适合跟注 (Call)。`;
+        } else {
+            correctAction = 'Fold';
+            reason = `GTO 策略：面对 ${villainPos} 的紧组范围，${hand} 隔离风险极高，应弃牌 (Fold)。`;
+        }
+    }
+
+    return { correctAction, reason };
+}
+
+function handleDecision(userAction) {
+    const duration = Date.now() - startTime;
+    const analysis = evaluateGTO(currentHand.hand, currentHand.heroPos, currentHand.villainPos);
+    const isCorrect = (userAction === analysis.correctAction);
+
+    localHistory.push({
+        hand: currentHand.hand,
+        pos: currentHand.heroPos,
+        userAction: userAction,
+        isCorrect: isCorrect,
+        timeMs: duration
+    });
+    localStorage.setItem('poker_v4_history', JSON.stringify(localHistory));
+
+    const fb = document.getElementById('feedback');
+    if (isCorrect) {
+        fb.innerHTML = `<div style="color:var(--accent-green);font-weight:bold;font-size:16px;">✅ 正确决策 (${userAction})</div><div style="font-size:13px;color:#cbd5e1;margin-top:4px;">${analysis.reason}</div>`;
+    } else {
+        fb.innerHTML = `<div style="color:var(--accent-red);font-weight:bold;font-size:16px;">❌ 偏离 GTO (你选了 ${userAction} | GTO 建议: ${analysis.correctAction})</div><div style="font-size:13px;color:#cbd5e1;margin-top:4px;">${analysis.reason}</div>`;
+    }
+
+    updateDashboard();
+    setTimeout(loadNextHand, 1800);
+}
+
+function updateDashboard() {
+    const total = localHistory.length;
+    document.getElementById('st-hands').innerText = total;
+    
+    if (total > 0) {
+        const correctCount = localHistory.filter(h => h.isCorrect).length;
+        const acc = Math.round((correctCount / total) * 100);
+        document.getElementById('st-acc').innerText = `${acc}%`;
+
+        const avgTime = Math.round(localHistory.reduce((a, b) => a + b.timeMs, 0) / total);
+        document.getElementById('st-time').innerText = `${(avgTime/1000).toFixed(1)}s`;
+    }
+}
+
+function renderMatrix() {
+    const grid = document.getElementById('matrix-grid');
+    grid.innerHTML = '';
+    
+    const handStats = {};
+    localHistory.forEach(h => {
+        if (!handStats[h.hand]) handStats[h.hand] = { total: 0, correct: 0 };
+        handStats[h.hand].total++;
+        if (h.isCorrect) handStats[h.hand].correct++;
+    });
+
+    for (let r = 0; r < 13; r++) {
+        for (let c = 0; c < 13; c++) {
+            let label = (r === c) ? RANKS[r]+RANKS[c] : (r < c ? RANKS[r]+RANKS[c]+'s' : RANKS[c]+RANKS[r]+'o');
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell';
+            cell.innerText = label;
+
+            const stat = handStats[label];
+            if (stat && stat.total > 0) {
+                const acc = stat.correct / stat.total;
+                if (acc >= 0.8) cell.classList.add('mastered');
+                else cell.classList.add('leak');
+            }
+            grid.appendChild(cell);
+        }
+    }
+}
+
+function showDiagnosisModal() {
+    document.getElementById('ai-modal').style.display = 'flex';
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) document.getElementById('gemini-key').value = savedKey;
+}
+
+function closeModal() {
+    document.getElementById('ai-modal').style.display = 'none';
+}
+
+async function runAIDiagnosis() {
+    const key = document.getElementById('gemini-key').value.trim();
+    if (!key) { alert('请输入有效的 API Key'); return; }
+    localStorage.setItem('gemini_api_key', key);
+
+    const recent = localHistory.slice(-100);
+    if (recent.length === 0) { alert('尚无训练数据'); return; }
+
+    const resBox = document.getElementById('ai-result');
+    resBox.innerText = "🤖 Gemini 战术教练正在分析你最近 100 手牌数据...";
+
+    const systemPrompt = `你是一位职业级 6-Max 德州扑克 GTO 教练。根据 Hero Hank 最近训练 JSON 数据，客观分析其漏洞与 EV 损失。给出 300 字精炼诊断，拒绝无脑夸奖，突出阻断与范围漏洞。`;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Type': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: systemPrompt + "\n数据如下:\n" + JSON.stringify(recent) }] }] })
+        });
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+            resBox.innerText = data.candidates[0].content.parts[0].text;
+        } else {
+            resBox.innerText = "诊断失败，请检查 API Key 或网络。";
+        }
+    } catch (e) {
+        resBox.innerText = "请求异常，请确认 Key 是否正确。";
+    }
+}
+
+loadNextHand();
+</script>
+</body>
+</html>
