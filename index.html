@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>GTO 训练舱 v11.0 - 深度校准版</title>
+    <style>
+        :root {
+            --bg-dark: #020617; --card-bg: #1e293b; --accent: #f59e0b;
+            --success: #10b981; --danger: #ef4444; --felt: #064e3b;
+            --unseen: #334155; --low-acc: #991b1b; --mid-acc: #854d0e; --high-acc: #166534;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        body { 
+            background-color: var(--bg-dark); color: white; display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh; padding: 10px; padding-bottom: env(safe-area-inset-bottom); overflow: hidden; 
+        }
+
+        .top-nav { width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--card-bg); border-radius: 12px; margin-bottom: 10px; border: 1px solid #334155; }
+        .mode-select { background: #0f172a; color: var(--accent); border: 1px solid var(--accent); padding: 8px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; }
+        .stat-group { display: flex; gap: 15px; font-family: monospace; font-size: 0.85rem; }
+
+        .table-view {
+            position: relative; width: 100%; max-width: 850px; height: 380px;
+            background: radial-gradient(circle, #134e4a 0%, #064e3b 100%);
+            border: 10px solid #3d2b1f; border-radius: 190px; margin: 10px 0;
+            display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 80px rgba(0,0,0,0.6);
+        }
+
+        .seat { position: absolute; width: 64px; height: 64px; background: #1e293b; border: 2px solid #475569; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; transition: 0.3s; z-index: 5; }
+        .seat.hero { border-color: var(--accent); box-shadow: 0 0 20px var(--accent); color: var(--accent); transform: scale(1.1); }
+        .seat.villain { border-color: var(--danger); background: #450a0a; animation: pulse 1.5s infinite; }
+        .dealer-chip { position: absolute; bottom: -5px; right: -5px; background: white; color: black; width: 22px; height: 22px; border-radius: 50%; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 1.5px solid #000; }
+        
+        @keyframes pulse { 0% {box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);} 70% {box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);} 100% {box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);} }
+
+        .pos-UTG { top: 45%; right: 5%; } .pos-HJ { bottom: 10%; right: 30%; } .pos-CO { bottom: 10%; left: 30%; }
+        .pos-BTN { top: 45%; left: 5%; } .pos-SB { top: 10%; left: 30%; } .pos-BB { top: 10%; right: 30%; }
+
+        .scene-layer { position: absolute; top: 22%; text-align: center; width: 100%; z-index: 2; pointer-events: none; }
+        .hint-bubble { background: var(--danger); color: white; padding: 4px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        .hand-layer { display: flex; gap: 15px; z-index: 10; }
+        .card { width: 85px; height: 120px; background: white; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; color: black; font-weight: 900; font-size: 2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .suit-red { color: #dc2626; }
+
+        #feedback-overlay { 
+            position: absolute; inset: 0; background: rgba(15, 23, 42, 0.6); 
+            backdrop-filter: blur(4px); border-radius: 180px; display: none; 
+            flex-direction: column; justify-content: flex-end; align-items: center; 
+            z-index: 100; padding-bottom: 45px; text-align: center; 
+        }
+        .res-badge { font-size: 2.2rem; font-weight: 900; margin-bottom: 8px; text-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .coach-text { background: rgba(0,0,0,0.8); padding: 12px 20px; border-radius: 12px; max-width: 85%; font-size: 1rem; color: #f8fafc; border: 1px solid #475569; }
+
+        .controls { width: 100%; max-width: 900px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }
+        .ctrl-btn { border: none; border-radius: 14px; padding: 25px; font-size: 1.4rem; font-weight: 800; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+        .fold { background: #334155; } .call { background: #065f46; } .raise { background: #991b1b; }
+        .next-trigger { width: 100%; max-width: 900px; background: #6366f1; color: white; padding: 20px; border-radius: 14px; border: none; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: none; margin-top: 10px; }
+
+        #settings-modal { position: fixed; inset: 0; background: rgba(2,6,23,0.9); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .config-card { background: var(--card-bg); padding: 30px; border-radius: 16px; width: 100%; max-width: 400px; border: 1px solid #6366f1; }
+        input[type="password"] { width: 100%; padding: 12px; margin: 15px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 8px; }
+        
+        #modal-matrix, #modal-ai { position: fixed; inset: 0; background: rgba(2,6,23,0.98); z-index: 1100; display: none; flex-direction: column; align-items: center; padding: 20px; overflow-y: auto; }
+        .matrix-grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 2px; width: 100%; max-width: 650px; margin-top: 20px; }
+        .m-cell { aspect-ratio: 1; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="top-nav">
+        <select id="training-mode" class="mode-select" onchange="initNewHand()">
+            <option value="RANDOM">混合实战模式</option>
+            <option value="UTG">专项：UTG</option><option value="HJ">专项：HJ</option>
+            <option value="CO">专项：CO</option><option value="BTN">专项：BTN</option>
+            <option value="SB">专项：SB</option><option value="BB">专项：BB防御</option>
+        </select>
+        <div class="stat-group">
+            <span id="st-hands">总计: 0</span>
+            <span id="st-acc">准度: 0%</span>
+            <span id="st-mastery">达标: 0%</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button onclick="toggleMatrix()" style="background:none; border:1px solid #475569; color:white; padding:4px 10px; border-radius:8px; font-size:0.8rem;">矩阵</button>
+            <button onclick="openSettings()" style="background:none; border:1px solid #475569; color:white; padding:4px 10px; border-radius:8px; font-size:0.8rem;">⚙️</button>
+        </div>
+    </div>
+
+    <div class="table-view">
+        <div id="feedback-overlay">
+            <div id="fb-res" class="res-badge">CORRECT</div>
+            <div id="fb-coach" class="coach-text"></div>
+        </div>
+
+        <div id="seat-UTG" class="seat pos-UTG">UTG</div>
+        <div id="seat-HJ" class="seat pos-HJ">HJ</div>
+        <div id="seat-CO" class="seat pos-CO">CO</div>
+        <div id="seat-BTN" class="seat pos-BTN">BTN</div>
+        <div id="seat-SB" class="seat pos-SB">SB</div>
+        <div id="seat-BB" class="seat pos-BB">BB</div>
+
+        <div class="scene-layer">
+            <div id="fac-hint" class="hint-bubble" style="display:none;"></div>
+            <div id="pot-txt" style="color:#fbbf24; font-family:monospace; font-weight:bold; margin-top:5px;">POT: 1.5 BB</div>
+        </div>
+
+        <div class="hand-layer" id="hero-hand"></div>
+    </div>
+
+    <div class="controls" id="btn-group">
+        <button class="ctrl-btn fold" onclick="makeDecision('Fold')">弃牌<span>Fold</span></button>
+        <button class="ctrl-btn call" onclick="makeDecision('Call')">跟注<span>Call</span></button>
+        <button class="ctrl-btn raise" onclick="makeDecision('Raise')">加注<span>Raise</span></button>
+    </div>
+
+    <button id="next-btn" class="next-trigger" onclick="initNewHand()">下一手 (NEXT HAND)</button>
+
+    <div id="modal-ai">
+        <h1 style="color:var(--accent); font-size:1.8rem;">⚡ AI 战术复盘</h1>
+        <div id="ai-content" style="background:#1e293b; border:1.5px solid #6366f1; padding:25px; border-radius:16px; color:#e2e8f0; line-height:1.8; text-align:left; max-width:800px; width:100%; white-space:pre-wrap; margin-top:20px;"></div>
+        <button onclick="closeAiModal()" style="background:#6366f1; color:white; border:none; padding:15px 40px; border-radius:12px; margin-top:20px; font-weight:bold;">继续训练</button>
+    </div>
+
+    <div id="modal-matrix">
+        <h2 style="margin-top:20px;">169 矩阵覆盖率</h2>
+        <div id="matrix-container" class="matrix-grid"></div>
+        <button onclick="toggleMatrix()" style="background:#475569; color:white; border:none; padding:12px 30px; border-radius:8px; margin-top:20px; font-weight:bold;">关闭</button>
+    </div>
+
+    <div id="settings-modal">
+        <div class="config-card">
+            <h3 style="color:var(--accent)">配置中心</h3>
+            <p style="font-size:0.8rem; color:#94a3b8; margin-top:10px;">稳定版本：gemini-1.5-pro</p>
+            <input type="password" id="api-key-input" placeholder="输入 API 密钥...">
+            <button onclick="saveApiKey()" style="width:100%; background:#6366f1; border:none; padding:12px; color:white; border-radius:8px; font-weight:bold;">保存</button>
+            <button onclick="closeSettings()" style="width:100%; background:none; border:none; color:#94a3b8; margin-top:10px;">取消</button>
+        </div>
+    </div>
+
+    <script>
+        const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+        const SUITS = [{s:'♠',r:false}, {s:'♥',r:true}, {s:'♣',r:false}, {s:'♦',r:true}];
+        const POSITIONS = ['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+        
+        let stats = JSON.parse(localStorage.getItem('poker_v11_stats') || '{"total":0, "right":0, "logs":[]}');
+        let heatmap = JSON.parse(localStorage.getItem('poker_v11_heatmap') || '{}');
+        let milestones = JSON.parse(localStorage.getItem('poker_v11_miles') || '[]');
+        let state = { hand: null, heroPos: '', villainPos: null, correctAction: '', startTime: 0 };
+
+        /** 
+         * 1. 范围解析器 (Range Parser)
+         */
+        const RFI_RANGES = {
+            'UTG': ['77+', 'AKs', 'AQs', 'AJs', 'ATs', 'KQs', 'AKo', 'AQo'],
+            'HJ':  ['66+', 'A9s+', 'KQs', 'KJs', 'QJs', 'JTs', 'AKo', 'AQo', 'AJo'],
+            'CO':  ['55+', 'A2s+', 'KTs+', 'QTs+', 'JTs', 'T9s', '98s', 'AKo+', 'KQo', 'AJo', 'ATo'],
+            'BTN': ['22+', 'A2s+', 'K2s+', 'Q2s+', 'J2s+', 'T7s+', '97s+', '86s+', '76s', '65s', '54s', 'A2o+', 'K9o+', 'Q9o+', 'J9o+', 'T9o', '98o', '87o'],
+            'SB':  ['22+', 'A2s+', 'K2s+', 'Q2s+', 'J2s+', 'T8s+', '97s+', '86s+', '76s+', '65s+', 'A2o+', 'KTo+', 'QTo+', 'JTo+']
+        };
+
+        function isHandInRfiRange(handKey, pos) {
+            const range = RFI_RANGES[pos];
+            if (!range) return false;
+            
+            const r1 = handKey[0], r2 = handKey[1], type = handKey[2] || '';
+            const idx1 = RANKS.indexOf(r1), idx2 = RANKS.indexOf(r2);
+
+            for (let item of range) {
+                if (item.endsWith('+') && r1 === r2) {
+                    if (idx1 <= RANKS.indexOf(item[0])) return true;
+                }
+                if (item.endsWith('+') && item.length >= 4) {
+                    const iType = item[2];
+                    if (type === iType && r1 === item[0] && idx2 <= RANKS.indexOf(item[1])) return true;
+                }
+                if (item === 'A2s+' && type === 's' && r1 === 'A') return true;
+                if (item === 'K2s+' && type === 's' && r1 === 'K') return true;
+                if (item === 'Q2s+' && type === 's' && r1 === 'Q') return true;
+                if (item === handKey) return true;
+            }
+            return false;
+        }
+
+        /** 2. 1326 发牌系统 **/
+        function drawHand() {
+            const rand = Math.floor(Math.random() * 1326);
+            if (rand < 78) {
+                const r = RANKS[Math.floor(rand/6)]; return { h:[{r,s:SUITS[0]},{r,s:SUITS[1]}], t:'p', key:r+r };
+            } else if (rand < 390) {
+                const pIdx = Math.floor((rand-78)/4);
+                const k = getRankPair(pIdx); return { h:[{r:k.r1,s:SUITS[0]},{r:k.r2,s:SUITS[0]}], t:'s', key:k.r1+k.r2+'s' };
+            } else {
+                const pIdx = Math.floor((rand-390)/12);
+                const k = getRankPair(pIdx); return { h:[{r:k.r1,s:SUITS[0]},{r:k.r2,s:SUITS[1]}], t:'o', key:k.r1+k.r2+'o' };
+            }
+        }
+        function getRankPair(idx) {
+            let k = 0;
+            for(let i=0; i<13; i++) { for(let j=i+1; j<13; j++) { if(k === idx) return { r1:RANKS[i], r2:RANKS[j] }; k++; } }
+        }
+
+        /** 3. 动态 GTO 决策核心 (修复 Call 逻辑与 BB 深度) **/
+        function getAction(hand, pos, villain) {
+            const key = hand.key;
+            if (!villain) return isHandInRfiRange(key, pos) ? 'Raise' : 'Fold';
+
+            const vIdx = POSITIONS.indexOf(villain);
+            const hIdx = POSITIONS.indexOf(pos);
+            const dist = hIdx - vIdx;
+            const r1 = RANKS.indexOf(hand.h[0].r);
+            const r2 = RANKS.indexOf(hand.h[1].r);
+
+            // 1. 强牌 (Premium) 总是加注 (3-Bet)
+            const premium3bet = ['AA','KK','QQ','JJ','AKs','AKo'];
+            if (premium3bet.includes(key)) return 'Raise';
+
+            // 2. BB 特化逻辑：分三档处理
+            if (pos === 'BB') {
+                const isSuited = hand.t === 's';
+                // vs BTN/SB (宽防守)
+                if (vIdx >= 3) {
+                    if (['TT','99','88','AQs','AJs','A5s','A4s','KQs'].includes(key)) return 'Raise';
+                    if (r1 <= 3 && r2 <= 5) return 'Call'; // Broadways Offsuit (KQo, KJo, QJo etc)
+                    if (isSuited || r1 <= 6) return 'Call';
+                }
+                // vs CO (中等防守)
+                else if (vIdx === 2) {
+                    if (['TT','99','AQs','AJs','KQs'].includes(key)) return 'Raise';
+                    if (isSuited && r1 <= 6) return 'Call';
+                    if (r1 <= 2 && r2 <= 3) return 'Call'; // KQo, AJo
+                }
+                // vs UTG/HJ (窄防守)
+                else {
+                    if (isSuited && r1 <= 4) return 'Call'; 
+                    if (key === 'KQs' || key === 'AQo') return 'Call';
+                }
+                return 'Fold';
+            }
+
+            // 3. 非 BB 位面对加注 (修正 Call 逻辑缺失)
+            if (hIdx > vIdx && pos !== 'BB') {
+                const flats = ['TT','99','88','AQs','AJs','KQs','KJs','QJs','JTs'];
+                const bluffs = ['A5s','A4s','A3s'];
+
+                // 面对前位 (UTG/HJ)
+                if (vIdx <= 1) {
+                    if (['TT','99','AQs','AJs','KQs'].includes(key)) return 'Call';
+                } 
+                // 面对后位 (CO/BTN)
+                else {
+                    if (bluffs.includes(key)) return 'Raise';
+                    if (flats.includes(key)) return 'Call';
+                }
+            }
+
+            return 'Fold';
+        }
+
+        /** 4. 训练流控 **/
+        function initNewHand() {
+            document.getElementById('feedback-overlay').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'none';
+            const mode = document.getElementById('training-mode').value;
+            state.heroPos = (mode === 'RANDOM') ? POSITIONS[Math.floor(Math.random() * 6)] : mode;
+            state.currentHand = drawHand();
+            
+            const hIdx = POSITIONS.indexOf(state.heroPos);
+            if (hIdx > 0 && Math.random() > 0.45) {
+                const candidates = POSITIONS.slice(0, hIdx);
+                state.villainPos = candidates[Math.floor(Math.random() * candidates.length)];
+            } else { state.villainPos = null; }
+
+            state.correctAction = getAction(state.currentHand, state.heroPos, state.villainPos);
+            updateUI();
+            state.startTime = Date.now();
+        }
+
+        function updateUI() {
+            POSITIONS.forEach(p => {
+                const el = document.getElementById(`seat-${p}`);
+                el.className = `seat pos-${p} ${p===state.heroPos?'hero':''} ${p===state.villainPos?'villain':''}`;
+                el.innerHTML = p + (p === 'BTN' ? '<div class="dealer-chip">D</div>' : '');
+            });
+            document.getElementById('hero-hand').innerHTML = state.currentHand.h.map(c => `
+                <div class="card ${c.s.r?'suit-red':''}"><span>${c.r}</span><span style="align-self:flex-end;">${c.s.s}</span></div>
+            `).join('');
+            const hint = document.getElementById('fac-hint');
+            hint.style.display = state.villainPos ? 'inline-block' : 'none';
+            if(state.villainPos) hint.innerText = `面对 ${state.villainPos} Raise 2.5BB`;
+            document.getElementById('pot-txt').innerText = `POT: ${state.villainPos ? '4.0' : '1.5'} BB`;
+            
+            const ms = Object.values(heatmap).filter(h => h.seen >= 5 && h.r/h.seen > 0.9).length;
+            document.getElementById('st-hands').innerText = `总计: ${stats.total}`;
+            document.getElementById('st-acc').innerText = `准度: ${(stats.right/(stats.total||1)*100).toFixed(1)}%`;
+            document.getElementById('st-mastery').innerText = `达标: ${Math.round(ms/169*100)}%`;
+        }
+
+        function makeDecision(action) {
+            const isRight = (action === state.correctAction);
+            stats.total++; if(isRight) stats.right++;
+            stats.logs.push({ h:state.currentHand.key, p:state.heroPos, v:state.villainPos, u:action, g:state.correctAction });
+            const key = state.currentHand.key;
+            if(!heatmap[key]) heatmap[key] = {seen:0, r:0};
+            heatmap[key].seen++; if(isRight) heatmap[key].r++;
+            
+            localStorage.setItem('poker_v11_stats', JSON.stringify(stats));
+            localStorage.setItem('poker_v11_heatmap', JSON.stringify(heatmap));
+
+            document.getElementById('feedback-overlay').style.display = 'flex';
+            document.getElementById('fb-res').innerText = isRight ? "正确 ✅" : "错误 ❌";
+            document.getElementById('fb-res').style.color = isRight ? "var(--success)" : "var(--danger)";
+            document.getElementById('fb-coach').innerHTML = `GTO 建议: <b>${state.correctAction.toUpperCase()}</b><br>场景: ${state.heroPos}位 ${state.villainPos ? '面对 '+state.villainPos : '率先开池'}`;
+            document.getElementById('next-btn').style.display = 'block';
+
+            [100, 500, 1000].forEach(m => {
+                if (stats.total >= m && !milestones.includes(m)) {
+                    milestones.push(m);
+                    localStorage.setItem('poker_v11_miles', JSON.stringify(milestones));
+                    runAiAudit(m);
+                }
+            });
+        }
+
+        /** 5. 配置管理 **/
+        function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
+        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+        function saveApiKey() {
+            const val = document.getElementById('api-key-input').value;
+            if(val) { localStorage.setItem('gemini_api_key', val.trim()); alert("配置保存成功"); closeSettings(); location.reload(); }
+        }
+
+        async function runAiAudit(m) {
+            const key = localStorage.getItem('gemini_api_key');
+            if(!key) return;
+            const modal = document.getElementById('modal-ai');
+            modal.style.display = 'flex';
+            const logSlice = stats.logs.slice(-50).filter(l => l.u !== l.g);
+            const prompt = `你是扑克教练。玩家打满 ${m} 手，准度 ${(stats.right/stats.total*100).toFixed(1)}%。分析错误并给出3条建议：${JSON.stringify(logSlice)}`;
+            
+            try {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${key}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const data = await resp.json();
+                document.getElementById('ai-content').innerText = data.candidates[0].content.parts[0].text;
+            } catch (e) { document.getElementById('ai-content').innerText = "AI 诊断失败，请检查密钥或网络。"; }
+        }
+
+        function closeAiModal() { document.getElementById('modal-ai').style.display = 'none'; }
+        function toggleMatrix() {
+            const m = document.getElementById('modal-matrix');
+            if(m.style.display === 'flex') { m.style.display = 'none'; return; }
+            m.style.display = 'flex';
+            let html = '';
+            RANKS.forEach((r1, i) => { RANKS.forEach((r2, j) => {
+                let k = (i === j) ? r1+r2 : (i < j ? r1+r2+'s' : r2+r1+'o');
+                let d = heatmap[k] || {seen:0, r:0};
+                let acc = d.seen > 0 ? d.r / d.seen : -1;
+                let color = 'var(--unseen)';
+                if(acc>=0) color = (acc>=0.9 && d.seen>=5) ? 'var(--high-acc)' : (acc<0.75 ? 'var(--low-acc)' : 'var(--mid-acc)');
+                html += `<div class="m-cell" style="background:${color}">${k}</div>`;
+            }); });
+            document.getElementById('matrix-container').innerHTML = html;
+        }
+
+        window.onload = initNewHand;
+    </script>
+</body>
+</html>
